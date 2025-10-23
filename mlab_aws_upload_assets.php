@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Prestashop Module to manage cookie policy banner
+ * Prestashop Module to upload product images to AWS S3
  * @author mlabfactory <tech@mlabfactory.com>
- * MlabPs - Cookie Policy Module
+ * MlabPs - AWS Upload Assets Module
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -14,9 +14,9 @@ if (!defined('_PS_VERSION_')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 } else {
-    // Autoloader alternativo manuale - CORRETTO IL NAMESPACE
+    // Autoloader alternativo manuale
     spl_autoload_register(function ($className) {
-        $prefix = 'MlabPs\\CookiePolicyModule\\';
+        $prefix = 'MlabPs\\AwsUploadAssets\\';
         $base_dir = __DIR__ . '/src/';
         
         $len = strlen($prefix);
@@ -34,7 +34,7 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 }
 
 // IMPORTANTE: use statement DOPO l'autoloader
-use MlabPs\CookiePolicyModule\Controllers\ModuleController;
+use MlabPs\AwsUploadAssets\Controllers\ModuleController;
 
 
 class mlab_aws_upload_assets extends Module
@@ -62,7 +62,7 @@ class mlab_aws_upload_assets extends Module
         parent::__construct();
 
         $this->displayName = $this->l('MLab AWS Upload Assets Module');
-        $this->description = $this->l('Upload assets to AWS S3');
+        $this->description = $this->l('Upload product images to AWS S3');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall this module?');
 
         // Inizializza i controller solo dopo il parent constructor
@@ -96,59 +96,10 @@ class mlab_aws_upload_assets extends Module
 
     public function install()
     {
-        // Check if compiled JavaScript exists
-        $jsFile = $this->_path . 'assets/js/cookie-policy.js';
-        if (!file_exists($jsFile) || filesize($jsFile) === 0) {
-            // Try to compile TypeScript if possible
-            if (!$this->compileTypeScript()) {
-                // If compilation fails, show error
-                $this->_errors[] = $this->l('Cookie policy JavaScript file is missing. Please compile TypeScript first: cd modules/mlab_cookie_policy && npx tsc');
-                return false;
-            }
-        }
-        
         return parent::install() &&
-            $this->registerHook('displayHeader') && // Per includere CSS/JS
-            $this->registerHook('displayFooter') && // Banner nel footer
-            $this->registerHook('displayFooterAfter'); // Banner dopo il footer
-    }
-
-    /**
-     * Try to compile TypeScript to JavaScript
-     * @return bool True if compilation succeeded or was not needed, false if required but failed
-     */
-    private function compileTypeScript(): bool
-    {
-        $tsFile = $this->_path . 'assets/ts/cookie-policy.ts';
-        $jsFile = $this->_path . 'assets/js/cookie-policy.js';
-        
-        // Check if TypeScript file exists
-        if (!file_exists($tsFile)) {
-            return false;
-        }
-        
-        // Check if node and npx are available
-        $nodeCheck = shell_exec('which node 2>/dev/null');
-        $npxCheck = shell_exec('which npx 2>/dev/null');
-        
-        if (empty($nodeCheck) || empty($npxCheck)) {
-            // Node.js not available, cannot compile
-            return false;
-        }
-        
-        // Try to compile
-        $output = [];
-        $returnCode = 0;
-        
-        chdir($this->_path);
-        exec('npx tsc 2>&1', $output, $returnCode);
-        
-        // Check if compilation was successful
-        if ($returnCode === 0 && file_exists($jsFile) && filesize($jsFile) > 0) {
-            return true;
-        }
-        
-        return false;
+            $this->registerHook('actionWatermark') && // Quando le immagini vengono rigenerate
+            $this->registerHook('actionAfterImageUpload') && // Dopo l'upload di un'immagine
+            $this->registerHook('actionAfterUpdateProductImage'); // Dopo l'aggiornamento di un'immagine prodotto
     }
 
     public function uninstall()
@@ -157,27 +108,28 @@ class mlab_aws_upload_assets extends Module
     }
 
     /**
-     * Hook per aggiungere CSS e JS nel header
+     * Hook chiamato quando le immagini vengono rigenerate
+     * Questo hook viene chiamato per ogni immagine rigenerata con tutti i suoi tagli
      */
-    public function hookDisplayHeader($params)
+    public function hookActionWatermark($params)
     {
-        return $this->getModuleController()->handleDisplayHeader();
+        return $this->getModuleController()->handleImageRegeneration($params);
     }
 
     /**
-     * Hook per mostrare il banner nel footer
+     * Hook chiamato dopo l'upload di un'immagine
      */
-    public function hookDisplayFooter($params)
+    public function hookActionAfterImageUpload($params)
     {
-        return $this->getModuleController()->handleDisplayFooter();
+        return $this->getModuleController()->handleImageUpload($params);
     }
 
     /**
-     * Hook per mostrare il banner dopo il footer
+     * Hook chiamato dopo l'aggiornamento di un'immagine prodotto
      */
-    public function hookDisplayFooterAfter($params)
+    public function hookActionAfterUpdateProductImage($params)
     {
-        return $this->getModuleController()->handleDisplayFooter();
+        return $this->getModuleController()->handleProductImageUpdate($params);
     }
 
     /**

@@ -6,3 +6,17 @@ node_modules/
 *.d.ts.map
 *.js.map
 
+# Environment files with credentials
+.env
+.env.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

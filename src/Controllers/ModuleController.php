@@ -1,17 +1,18 @@
 <?php
 
-namespace MlabPs\CookiePolicyModule\Controllers;
+namespace MlabPs\AwsUploadAssets\Controllers;
 
-// Rimuoviamo temporaneamente i use delle classi mancanti
-// use MlabPs\CookiePolicyModule\Objects\CookieTabConfiguration;
-// use MlabPs\CookiePolicyModule\Objects\ModuleConfigurations;
+use Aws\S3\S3Client;
+use Aws\Exception\AwsException;
+use MlabPs\AwsUploadAssets\Services\S3Uploader;
 
 class ModuleController
 {
     private \Context $context;
-    private string $moduleName = 'mlab_cookie_policy';
+    private string $moduleName = 'mlab_aws_upload_assets';
     private \Module $module;
     private string $modulePath;
+    private ?S3Uploader $s3Uploader = null;
     
 
     public function __construct(\Module $module, string $moduleName, string $modulePath)
@@ -20,6 +21,177 @@ class ModuleController
         $this->module = $module;
         $this->moduleName = $moduleName;
         $this->modulePath = $modulePath;
+    }
+
+    /**
+     * Ottiene l'istanza del servizio S3Uploader
+     */
+    private function getS3Uploader(): S3Uploader
+    {
+        if ($this->s3Uploader === null) {
+            $this->s3Uploader = new S3Uploader(
+                \Configuration::get('AWS_S3_BUCKET'),
+                \Configuration::get('AWS_ACCESS_KEY_ID'),
+                \Configuration::get('AWS_SECRET_ACCESS_KEY'),
+                \Configuration::get('AWS_REGION', 'eu-south-1'),
+                \Configuration::get('AWS_S3_PATH_PREFIX', 'products/')
+            );
+        }
+        return $this->s3Uploader;
+    }
+
+    /**
+     * Gestisce la rigenerazione delle immagini
+     * Questo hook viene chiamato per ogni immagine con tutti i suoi tagli
+     */
+    public function handleImageRegeneration($params)
+    {
+        try {
+            // Il parametro può contenere informazioni sull'immagine rigenerata
+            if (isset($params['id_image'])) {
+                $imageId = $params['id_image'];
+                $this->uploadProductImageAllSizes($imageId);
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            \PrestaShopLogger::addLog(
+                'AWS Upload - Image Regeneration Error: ' . $e->getMessage(),
+                3,
+                null,
+                'MlabAwsUploadAssets'
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Gestisce l'upload di un'immagine
+     */
+    public function handleImageUpload($params)
+    {
+        try {
+            if (isset($params['id_image'])) {
+                $imageId = $params['id_image'];
+                $this->uploadProductImageAllSizes($imageId);
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            \PrestaShopLogger::addLog(
+                'AWS Upload - Image Upload Error: ' . $e->getMessage(),
+                3,
+                null,
+                'MlabAwsUploadAssets'
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Gestisce l'aggiornamento di un'immagine prodotto
+     */
+    public function handleProductImageUpdate($params)
+    {
+        try {
+            if (isset($params['id_image'])) {
+                $imageId = $params['id_image'];
+                $this->uploadProductImageAllSizes($imageId);
+            }
+            
+            return true;
+        } catch (\Exception $e) {
+            \PrestaShopLogger::addLog(
+                'AWS Upload - Product Image Update Error: ' . $e->getMessage(),
+                3,
+                null,
+                'MlabAwsUploadAssets'
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Carica tutte le versioni (tagli) di un'immagine prodotto su S3
+     */
+    private function uploadProductImageAllSizes(int $imageId)
+    {
+        $image = new \Image($imageId);
+        if (!\Validate::isLoadedObject($image)) {
+            throw new \Exception("Image ID {$imageId} not found");
+        }
+
+        $product = new \Product($image->id_product);
+        if (!\Validate::isLoadedObject($product)) {
+            throw new \Exception("Product not found for image ID {$imageId}");
+        }
+
+        // Ottieni tutti i tipi di immagine configurati
+        $imageTypes = \ImageType::getImagesTypes('products');
+        
+        // Upload dell'immagine originale
+        $this->uploadImageFile($image, $product, null);
+
+        // Upload di tutti i tagli dell'immagine
+        foreach ($imageTypes as $imageType) {
+            $this->uploadImageFile($image, $product, $imageType);
+        }
+    }
+
+    /**
+     * Carica un singolo file immagine su S3
+     */
+    private function uploadImageFile(\Image $image, \Product $product, ?array $imageType = null)
+    {
+        $imagePath = $image->getPathForCreation();
+        
+        if ($imageType === null) {
+            // Immagine originale
+            $fullPath = $imagePath . '.jpg';
+            $s3Key = sprintf(
+                '%d/%d.jpg',
+                $product->id,
+                $image->id
+            );
+        } else {
+            // Immagine ridimensionata
+            $fullPath = $imagePath . '-' . $imageType['name'] . '.jpg';
+            $s3Key = sprintf(
+                '%d/%d-%s.jpg',
+                $product->id,
+                $image->id,
+                $imageType['name']
+            );
+        }
+
+        if (!file_exists($fullPath)) {
+            \PrestaShopLogger::addLog(
+                "AWS Upload - File not found: {$fullPath}",
+                2,
+                null,
+                'MlabAwsUploadAssets'
+            );
+            return;
+        }
+
+        try {
+            $this->getS3Uploader()->uploadFile($fullPath, $s3Key);
+            
+            \PrestaShopLogger::addLog(
+                "AWS Upload - Successfully uploaded: {$s3Key}",
+                1,
+                null,
+                'MlabAwsUploadAssets'
+            );
+        } catch (\Exception $e) {
+            \PrestaShopLogger::addLog(
+                "AWS Upload - Failed to upload {$s3Key}: " . $e->getMessage(),
+                3,
+                null,
+                'MlabAwsUploadAssets'
+            );
+            throw $e;
+        }
     }
 
     public function displayCookieBanner()
@@ -35,8 +207,8 @@ class ModuleController
         $form = [
             'form' => [
                 'legend' => [
-                    'title' => $this->module->l('Configurazione Cookie Policy'),
-                    'icon' => 'icon-cogs'
+                    'title' => $this->module->l('Configurazione AWS S3'),
+                    'icon' => 'icon-cloud-upload'
                 ],
                 'description' => $this->description(),
                 'input' => $this->getConfigurationFields(),
@@ -56,14 +228,15 @@ class ModuleController
         $helper->identifier = 'id_configuration';
         $helper->submit_action = 'submit' . $this->moduleName;
         $helper->currentIndex = $this->context->link->getAdminLink('AdminModules', false)
-            . '&configure=' . $this->moduleName . '&tab_module=front_office_features&module_name=' . $this->moduleName;
+            . '&configure=' . $this->moduleName . '&tab_module=back_office_features&module_name=' . $this->moduleName;
         $helper->token = \Tools::getAdminTokenLite('AdminModules');
 
-        // Usa configurazioni semplici invece delle classi
+        // Carica i valori correnti dalla configurazione
         $currentValues = [];
         foreach ($this->getConfigurationFields() as $field) {
             if (isset($field['name'])) {
-                $currentValues[$field['name']] = \Configuration::get($field['name'], '');
+                $defaultValue = isset($field['default']) ? $field['default'] : '';
+                $currentValues[$field['name']] = \Configuration::get($field['name'], $defaultValue);
             }
         }
 
@@ -77,67 +250,59 @@ class ModuleController
     }
 
     /**
-     * Configurazioni disponibili per il widget
+     * Configurazioni disponibili per il modulo
      */
     public function getConfigurationFields(): array
     {
-        // Definiamo le configurazioni direttamente invece di usare le classi
         return [
             [
                 'type' => 'text',
-                'label' => $this->module->l('Url pagina Privacy Policy'),
-                'name' => 'COOKIE_URL_PRIVACY_POLICY',
-                'class' => 'fixed-width-m',
-                'required' => false
+                'label' => $this->module->l('AWS Access Key ID'),
+                'name' => 'AWS_ACCESS_KEY_ID',
+                'class' => 'fixed-width-xxl',
+                'required' => true,
+                'desc' => $this->module->l('La tua AWS Access Key ID')
             ],
             [
                 'type' => 'text',
-                'label' => $this->module->l('Url pagina Cookie Policy'),
-                'name' => 'COOKIE_URL_COOKIE_POLICY',
-                'class' => 'fixed-width-m',
-                'required' => false
-            ],
-            [
-                'type' => 'textarea',
-                'label' => $this->module->l('Messaggio banner'),
-                'name' => 'COOKIE_DESCRIPTION_COOKIE_POLICY',
-                'class' => 'fixed-width-m',
-                'required' => false
+                'label' => $this->module->l('AWS Secret Access Key'),
+                'name' => 'AWS_SECRET_ACCESS_KEY',
+                'class' => 'fixed-width-xxl',
+                'required' => true,
+                'desc' => $this->module->l('La tua AWS Secret Access Key')
             ],
             [
                 'type' => 'text',
-                'label' => $this->module->l('Descrizione cookie di analisi'),
-                'name' => 'COOKIE_DESCRIPTION_COOKIE_ANALYTICS',
+                'label' => $this->module->l('AWS Region'),
+                'name' => 'AWS_REGION',
                 'class' => 'fixed-width-m',
-                'required' => false
+                'required' => true,
+                'desc' => $this->module->l('Regione AWS (es. eu-south-1, us-east-1)'),
+                'default' => 'eu-south-1'
             ],
             [
                 'type' => 'text',
-                'label' => $this->module->l('Descrizione cookie di marketing'),
-                'name' => 'COOKIE_DESCRIPTION_COOKIE_MARKETING',
-                'class' => 'fixed-width-m',
-                'required' => false
+                'label' => $this->module->l('S3 Bucket Name'),
+                'name' => 'AWS_S3_BUCKET',
+                'class' => 'fixed-width-xl',
+                'required' => true,
+                'desc' => $this->module->l('Nome del bucket S3 dove caricare le immagini')
             ],
             [
                 'type' => 'text',
-                'label' => $this->module->l('Descrizione cookie necessari'),
-                'name' => 'COOKIE_DESCRIPTION_COOKIE_NEEDED',
-                'class' => 'fixed-width-m',
-                'required' => false
-            ],
-            [
-                'type' => 'text',
-                'label' => $this->module->l('Descrizione cookie personalizzati'),
-                'name' => 'COOKIE_DESCRIPTION_COOKIE_CUSTOM',
-                'class' => 'fixed-width-m',
+                'label' => $this->module->l('S3 Path Prefix'),
+                'name' => 'AWS_S3_PATH_PREFIX',
+                'class' => 'fixed-width-l',
                 'required' => false,
+                'desc' => $this->module->l('Prefisso del percorso nel bucket (es. products/)'),
+                'default' => 'products/'
             ],
         ];
     }
     
     private function description(): string
     {
-        return $this->module->l('Configura le impostazioni per la gestione della Cookie Policy, incluse le descrizioni dei vari tipi di cookie e il link alla pagina della privacy.');
+        return $this->module->l('Configura le credenziali AWS per caricare automaticamente le immagini dei prodotti su S3. Le immagini verranno caricate ogni volta che vengono aggiunte o rigenerate dal back office.');
     }
 
     /**
@@ -145,14 +310,14 @@ class ModuleController
      */
     private function renderTemplate(string $templateName): string
     {
-        $templatePath = _PS_MODULE_DIR_ . $this->moduleName . '/views/templates/hook/' . $templateName;
+        $templatePath = _PS_MODULE_DIR_ . $this->moduleName . '/views/templates/admin/' . $templateName;
 
         if (!file_exists($templatePath)) {
             \PrestaShopLogger::addLog(
                 "Template not found: {$templatePath}",
                 3,
                 null,
-                'MlabPsCookiePolicy'
+                'MlabAwsUploadAssets'
             );
             return '';
         }
@@ -160,149 +325,67 @@ class ModuleController
         return $this->context->smarty->fetch($templatePath);
     }
 
-    /**
-     * Metodo principale per generare il banner cookie
-     */
-    public function displayBanner(string $position = 'footer'): string
-    {
-        try {
-            // Usa direttamente Configuration invece delle classi
-            $templateVars = array_merge([
-                'banner_id' => 'mlab-banner-' . $position,
-                'banner_position' => $position,
-                'description' => \Configuration::get('COOKIE_DESCRIPTION_COOKIE_POLICY', ''),
-                'privacy_url' => \Configuration::get('COOKIE_URL_PRIVACY_POLICY', ''),
-                'cookie_url' => \Configuration::get('COOKIE_URL_COOKIE_POLICY', ''),
-                'cookie_needed_description' => \Configuration::get('COOKIE_DESCRIPTION_COOKIE_NEEDED', ''),
-                'cookie_analytics_description' => \Configuration::get('COOKIE_DESCRIPTION_COOKIE_ANALYTICS', ''),
-                'cookie_marketing_description' => \Configuration::get('COOKIE_DESCRIPTION_COOKIE_MARKETING', ''),
-                'cookie_custom_description' => \Configuration::get('COOKIE_DESCRIPTION_COOKIE_CUSTOM', ''),
-            ], $this->dictionary());
-            
-            $this->context->smarty->assign($templateVars);
-
-            return $this->renderTemplate('cookie_banner.tpl');
-        } catch (\Exception $e) {
-            \PrestaShopLogger::addLog(
-                'Cookie Policy Banner Error: ' . $e->getMessage(),
-                3,
-                null,
-                'MlabPsCookiePolicy'
-            );
-            return '';
-        }
-    }
-
-    public function handleBackOfficeHeader($params)
-    {
-        try {
-            if (\Tools::getValue('configure') === $this->moduleName && \Tools::isSubmit('submit' . $this->moduleName)) {
-                $formData = [];
-                foreach ($this->getConfigurationFields() as $field) {
-                    if (isset($field['name'])) {
-                        $formData[$field['name']] = \Tools::getValue($field['name'], '');
-                    }
-                }
-
-                // Salva le configurazioni
-                foreach ($formData as $key => $value) {
-                    \Configuration::updateValue($key, $value);
-                }
-
-                // Messaggio di conferma
-                if (isset($this->context->controller->confirmations)) {
-                    $this->context->controller->confirmations[] = $this->module->l('Impostazioni salvate con successo.');
-                }
-            }
-
-            // Mostra il form di configurazione
-            if (\Tools::getValue('configure') === $this->moduleName) {
-                echo $this->displayConfigurationForm();
-            }
-        } catch (\Exception $e) {
-            \PrestaShopLogger::addLog(
-                'Cookie Policy BackOffice Error: ' . $e->getMessage(),
-                3,
-                null,
-                'MlabPsCookiePolicy'
-            );
-        }
-    }
-
-    private function dictionary(): array
-    {
-        return [
-            'accept_all' => $this->module->l('Accetta tutti i cookie'),
-            'reject_all' => $this->module->l('Rifiuta tutti i cookie'),
-            'customize' => $this->module->l('Personalizza'),
-            'save_preferences' => $this->module->l('Salva preferenze'),
-            'necessary_cookies' => $this->module->l('Cookie necessari'),
-            'analytics_cookies' => $this->module->l('Cookie di analisi'),
-            'marketing_cookies' => $this->module->l('Cookie di marketing'),
-            'custom_cookies' => $this->module->l('Cookie personalizzati'),
-            'cookie_policy' => $this->module->l('Cookie Policy'),
-            'privacy_policy' => $this->module->l('Privacy Policy'),
-            'close' => $this->module->l('Chiudi'),
-        ];
-    }
-
-    public function handleDisplayHeader()
-    {
-        try {
-            $this->context->controller->addCSS($this->module->getPathUri() . 'views/css/style.css');
-            $this->context->controller->addJS($this->module->getPathUri() . 'assets/js/cookie-policy.js');
-        } catch (\Exception $e) {
-            \PrestaShopLogger::addLog(
-                'Cookie Policy Header Error: ' . $e->getMessage(),
-                3,
-                null,
-                'MlabPsCookiePolicy'
-            );
-        }
-    }
-
-    public function handleDisplayFooter()
-    {
-        try {
-            return $this->displayBanner('footer');
-        } catch (\Exception $e) {
-            \PrestaShopLogger::addLog(
-                'Cookie Policy Footer Error: ' . $e->getMessage(),
-                3,
-                null,
-                'MlabPsCookiePolicy'
-            );
-            return '';
-        }
-    }
-
     public function handleConfiguration()
     {
         try {
-            return $this->displayConfigurationForm();
+            $output = '';
+            
+            // Gestione del submit del form
+            if (\Tools::isSubmit('submit' . $this->moduleName)) {
+                $errors = [];
+                
+                foreach ($this->getConfigurationFields() as $field) {
+                    if (isset($field['name'])) {
+                        $value = \Tools::getValue($field['name'], '');
+                        
+                        // Validazione campi required
+                        if (isset($field['required']) && $field['required'] && empty($value)) {
+                            $errors[] = sprintf(
+                                $this->module->l('Il campo "%s" è obbligatorio'),
+                                $field['label']
+                            );
+                        } else {
+                            \Configuration::updateValue($field['name'], $value);
+                        }
+                    }
+                }
+                
+                if (empty($errors)) {
+                    $output .= $this->module->displayConfirmation(
+                        $this->module->l('Impostazioni salvate con successo.')
+                    );
+                    
+                    // Test della connessione S3
+                    try {
+                        $s3Uploader = $this->getS3Uploader();
+                        if ($s3Uploader->testConnection()) {
+                            $output .= $this->module->displayConfirmation(
+                                $this->module->l('Connessione AWS S3 testata con successo!')
+                            );
+                        }
+                    } catch (\Exception $e) {
+                        $output .= $this->module->displayWarning(
+                            $this->module->l('Configurazione salvata ma errore nel test della connessione S3: ') . $e->getMessage()
+                        );
+                    }
+                } else {
+                    foreach ($errors as $error) {
+                        $output .= $this->module->displayError($error);
+                    }
+                }
+            }
+            
+            return $output . $this->displayConfigurationForm();
         } catch (\Exception $e) {
             \PrestaShopLogger::addLog(
-                'Cookie Policy Configuration Error: ' . $e->getMessage(),
+                'AWS Upload - Configuration Error: ' . $e->getMessage(),
                 3,
                 null,
-                'MlabPsCookiePolicy'
+                'MlabAwsUploadAssets'
             );
-            return $this->module->l('Si è verificato un errore durante il caricamento della configurazione.');
-        }
-    }
-
-    public function handleCookieBanner()
-    {
-        try {
-            return $this->displayBanner('footer');
-        } catch (\Exception $e) {
-            \PrestaShopLogger::addLog(
-                'Cookie Policy Banner Error: ' . $e->getMessage(),
-                3,
-                null,
-                'MlabPsCookiePolicy'
+            return $this->module->displayError(
+                $this->module->l('Si è verificato un errore durante il caricamento della configurazione.')
             );
-            return '';
         }
     }
 }

@@ -1,10 +1,10 @@
 {
-  "name": "mlab_cookie_policy",
-  "displayName": "MLab Cookie Policy",
+  "name": "mlab_aws_upload_assets",
+  "displayName": "MLab AWS Upload Assets",
   "version": "1.0.0",
-  "description": "Manage cookie policy banner",
+  "description": "Upload product images to AWS S3",
   "author": "mlabfactory",
-  "tab": "front_office_features",
+  "tab": "back_office_features",
   "is_configurable": 1,
   "need_instance": 0,
   "limited_countries": [],
@@ -16,18 +16,18 @@
   },
   "dependencies": [],
   "hooks": [
-    "displayHeader",
-    "displayFooter",
-    "displayFooterAfter"
+    "actionWatermark",
+    "actionAfterImageUpload",
+    "actionAfterUpdateProductImage"
   ],
   "translations": {
     "en": {
-      "displayName": "MLab Cookie Policy",
-      "description": "Manage cookie policy banner"
+      "displayName": "MLab AWS Upload Assets",
+      "description": "Upload product images to AWS S3"
     },
     "it": {
-      "displayName": "MLab Cookie Policy",
-      "description": "Gestisci il banner della cookie policy"
+      "displayName": "MLab AWS Upload Assets",
+      "description": "Carica le immagini dei prodotti su AWS S3"
     }
   }
 }
