@@ -1,9 +1,9 @@
 {
-    "name": "mlab/ps-cookie-policy-module",
-    "description": "Prestashop custom cookie policy module",
+    "name": "mlab/ps-aws-upload-assets",
+    "description": "Prestashop custom module to upload assets to AWS S3",
     "autoload": {
         "psr-4": {
-            "MlabPs\\CookiePolicyModule\\": "src/"
+            "MlabPs\\AwsUploadAssets\\": "src/"
         }
     },
     "authors": [

@@ -37,14 +37,14 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 use MlabPs\CookiePolicyModule\Controllers\ModuleController;
 
 
-class Mlab_Cookie_Policy extends Module
+class mlab_aws_upload_assets extends Module
 {
     private $moduleController;
 
     public function __construct()
     {
-        $this->name = 'mlab_cookie_policy';
-        $this->tab = 'front_office_features';
+        $this->name = 'mlab_aws_upload_assets';
+        $this->tab = 'back_office_features';
         $this->version = '1.0.0';
         $this->author = 'mlabfactory';
         $this->need_instance = 0;
@@ -61,8 +61,8 @@ class Mlab_Cookie_Policy extends Module
         // Chiamata SEMPRE sicura al parent constructor
         parent::__construct();
 
-        $this->displayName = $this->l('MLab Cookie Policy');
-        $this->description = $this->l('Activate the cookie policy banner');
+        $this->displayName = $this->l('MLab AWS Upload Assets Module');
+        $this->description = $this->l('Upload assets to AWS S3');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall this module?');
 
         // Inizializza i controller solo dopo il parent constructor
