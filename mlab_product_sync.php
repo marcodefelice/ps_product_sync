@@ -45,7 +45,7 @@ class mlab_product_sync extends Module
     {
         $this->name = 'mlab_product_sync';
         $this->tab = 'back_office_features';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'mlabfactory';
         $this->need_instance = 0;
         $this->_path = dirname(__FILE__) . '/';

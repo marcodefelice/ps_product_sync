@@ -15,6 +15,7 @@ Questo modulo sincronizza automaticamente i prodotti di PrestaShop con Google Me
 - ✅ Sincronizzazione automatica con Google Merchant Center
 - ✅ Architettura MVC (Model-View-Controller)
 - ✅ Sincronizzazione manuale di tutti i prodotti
+- ✅ **Generazione feed XML per Facebook Shop**
 - ✅ Pannello di configurazione intuitivo
 - ✅ Monitoraggio stato configurazione
 - ✅ Log dettagliati per debugging
@@ -84,6 +85,7 @@ mlab_product_sync/
 **Services**
 - **SyncService**: Orchestra la sincronizzazione
 - **GoogleMerchantService**: Gestisce le API di Google
+- **FacebookFeedService**: Genera il feed XML per Facebook Shop
 
 ## Configurazione Google Cloud
 
@@ -155,6 +157,24 @@ Per sincronizzare manualmente tutti i prodotti attivi:
 2. Scorri fino alla sezione "Manual Synchronization"
 3. Clicca su "Sync All Products Now"
 4. Attendi il completamento e verifica il risultato
+
+### Feed XML per Facebook Shop
+
+Il modulo può generare un feed XML compatibile con Facebook Shop:
+
+1. Vai nella pagina di configurazione del modulo
+2. Scorri fino alla sezione "Facebook Product Feed"
+3. Clicca su "Generate Facebook Feed"
+4. Il feed sarà disponibile all'URL mostrato nel pannello
+5. Usa questo URL per configurare il tuo catalogo prodotti su Facebook
+
+**Configurazione Facebook:**
+- Accedi a [Facebook Commerce Manager](https://business.facebook.com/commerce)
+- Vai su Cataloghi > Aggiungi Prodotti > Usa Feed Dati
+- Inserisci l'URL del feed generato
+- Configura la frequenza di aggiornamento (consigliato: giornaliera)
+
+**Nota:** Il feed viene salvato nella root del negozio come `facebook_product_feed.xml` ed è accessibile pubblicamente. Si consiglia di rigenerare il feed regolarmente per mantenere i prodotti aggiornati.
 
 ## Dati Sincronizzati
 
@@ -247,6 +267,11 @@ MLab Factory - tech@mlabfactory.it
 Copyright © 2024 MLab Factory - Tutti i diritti riservati
 
 ## Changelog
+
+### v1.1.0 (2024)
+- ✨ Aggiunta generazione feed XML per Facebook Shop
+- ✨ Pannello di gestione feed Facebook nel back office
+- ✨ Supporto formato XML RSS 2.0 per Facebook Catalog
 
 ### v1.0.0 (2024)
 - Release iniziale

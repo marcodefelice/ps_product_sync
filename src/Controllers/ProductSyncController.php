@@ -3,6 +3,7 @@
 namespace MlabPs\ProductSync\Controllers;
 
 use MlabPs\ProductSync\Services\SyncService;
+use MlabPs\ProductSync\Services\FacebookFeedService;
 use Configuration;
 use Tools;
 
@@ -13,11 +14,13 @@ class ProductSyncController
 {
     private $module;
     private $syncService;
+    private $facebookFeedService;
 
     public function __construct($module)
     {
         $this->module = $module;
         $this->syncService = new SyncService();
+        $this->facebookFeedService = new FacebookFeedService();
     }
 
     /**
@@ -109,6 +112,16 @@ class ProductSyncController
             $output .= $this->processSyncAllProducts();
         }
 
+        // Genera feed Facebook
+        if (Tools::isSubmit('generateFacebookFeed')) {
+            $output .= $this->processGenerateFacebookFeed();
+        }
+
+        // Elimina feed Facebook
+        if (Tools::isSubmit('deleteFacebookFeed')) {
+            $output .= $this->processDeleteFacebookFeed();
+        }
+
         // Mostra il form di configurazione
         $output .= $this->displayConfigurationForm();
 
@@ -150,6 +163,39 @@ class ProductSyncController
         );
 
         return $this->module->displayConfirmation($message);
+    }
+
+    /**
+     * Processa la generazione del feed Facebook
+     */
+    private function processGenerateFacebookFeed()
+    {
+        $result = $this->facebookFeedService->generateFeed();
+
+        if (!$result['success']) {
+            return $this->module->displayError($this->module->l('Error: ') . $result['message']);
+        }
+
+        $message = sprintf(
+            $this->module->l('Facebook feed generated successfully: %d products'),
+            $result['products_count']
+        );
+
+        return $this->module->displayConfirmation($message);
+    }
+
+    /**
+     * Processa l'eliminazione del feed Facebook
+     */
+    private function processDeleteFacebookFeed()
+    {
+        $result = $this->facebookFeedService->deleteFeed();
+
+        if ($result) {
+            return $this->module->displayConfirmation($this->module->l('Facebook feed deleted successfully'));
+        }
+
+        return $this->module->displayError($this->module->l('Error deleting Facebook feed'));
     }
 
     /**
@@ -246,6 +292,44 @@ class ProductSyncController
         $syncHtml .= '</div>';
         $syncHtml .= '</div>';
 
-        return $statusHtml . $output . $syncHtml;
+        // Facebook Feed section
+        $feedInfo = $this->facebookFeedService->getFeedInfo();
+        $facebookHtml = '<div class="panel">';
+        $facebookHtml .= '<div class="panel-heading">' . $this->module->l('Facebook Product Feed') . '</div>';
+        $facebookHtml .= '<div class="panel-body">';
+        
+        if ($feedInfo['exists']) {
+            $facebookHtml .= '<div class="alert alert-info">';
+            $facebookHtml .= '<p><strong>' . $this->module->l('Feed Status:') . '</strong> <span class="badge badge-success">' . $this->module->l('Generated') . '</span></p>';
+            $facebookHtml .= '<p><strong>' . $this->module->l('Products:') . '</strong> ' . $feedInfo['products_count'] . '</p>';
+            $facebookHtml .= '<p><strong>' . $this->module->l('Last Update:') . '</strong> ' . $feedInfo['last_update'] . '</p>';
+            $facebookHtml .= '<p><strong>' . $this->module->l('Size:') . '</strong> ' . $feedInfo['size'] . '</p>';
+            $facebookHtml .= '<p><strong>' . $this->module->l('Feed URL:') . '</strong> <a href="' . $feedInfo['url'] . '" target="_blank">' . $feedInfo['url'] . '</a></p>';
+            $facebookHtml .= '</div>';
+        } else {
+            $facebookHtml .= '<div class="alert alert-warning">';
+            $facebookHtml .= '<p>' . $this->module->l('Feed not yet generated. Click the button below to create your Facebook product feed.') . '</p>';
+            $facebookHtml .= '</div>';
+        }
+
+        $facebookHtml .= '<form method="post" action="' . \AdminController::$currentIndex . '&configure=' . $this->module->name . '&token=' . \Tools::getAdminTokenLite('AdminModules') . '" style="display: inline-block; margin-right: 10px;">';
+        $facebookHtml .= '<button type="submit" name="generateFacebookFeed" class="btn btn-success">';
+        $facebookHtml .= '<i class="icon-facebook"></i> ' . $this->module->l('Generate Facebook Feed');
+        $facebookHtml .= '</button>';
+        $facebookHtml .= '</form>';
+
+        if ($feedInfo['exists']) {
+            $facebookHtml .= '<form method="post" action="' . \AdminController::$currentIndex . '&configure=' . $this->module->name . '&token=' . \Tools::getAdminTokenLite('AdminModules') . '" style="display: inline-block;" onsubmit="return confirm(\'' . $this->module->l('Are you sure you want to delete the Facebook feed?') . '\');">';
+            $facebookHtml .= '<button type="submit" name="deleteFacebookFeed" class="btn btn-danger">';
+            $facebookHtml .= '<i class="icon-trash"></i> ' . $this->module->l('Delete Feed');
+            $facebookHtml .= '</button>';
+            $facebookHtml .= '</form>';
+        }
+
+        $facebookHtml .= '<p class="help-block" style="margin-top: 15px;">' . $this->module->l('Generate an XML feed file for Facebook Shop. Use the URL above to configure your Facebook product catalog.') . '</p>';
+        $facebookHtml .= '</div>';
+        $facebookHtml .= '</div>';
+
+        return $statusHtml . $output . $syncHtml . $facebookHtml;
     }
 }

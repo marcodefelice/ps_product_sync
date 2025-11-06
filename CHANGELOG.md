@@ -2,62 +2,69 @@
 
 Tutte le modifiche rilevanti a questo progetto saranno documentate in questo file.
 
+## [1.1.0] - 2024
+
+### Aggiunto
+- Generazione feed XML per Facebook Shop
+- Service class `FacebookFeedService` per gestione feed
+- Pannello di gestione feed nel back office
+- Supporto formato RSS 2.0 con namespace Google Shopping
+- URL pubblico per accesso feed
+- Informazioni dettagliate sul feed (numero prodotti, dimensione, ultima modifica)
+- Funzionalità eliminazione feed
+- Documentazione feed Facebook in FACEBOOK_FEED.md
+- Validazione prodotti prima dell'inclusione nel feed
+- Gestione immagini multiple (fino a 10 immagini aggiuntive)
+- Troncamento automatico testi per rispettare limiti Facebook
+
+### Caratteristiche Feed
+- Campi obbligatori: id, title, description, availability, condition, price, link, image_link
+- Campi opzionali: brand, gtin, mpn, product_type, google_product_category, additional_image_link
+- Solo prodotti attivi con dati validi
+- Formato prezzo con valuta (es: 29.99 EUR)
+- Disponibilità mappata (in stock, out of stock, preorder)
+
 ## [1.0.0] - 2024
 
 ### Aggiunto
-- Upload automatico di immagini prodotto su AWS S3
-- Supporto per tutti i formati/tagli immagine PrestaShop (small, medium, large, cart, home, etc.)
-- Hook `actionWatermark` per intercettare la rigenerazione delle immagini
-- Hook `actionAfterImageUpload` per intercettare l'upload di nuove immagini
-- Hook `actionAfterUpdateProductImage` per intercettare l'aggiornamento immagini
-- Service class `S3Uploader` per gestire le operazioni AWS S3
-- Form di configurazione nel back office per credenziali AWS
-- Test automatico della connessione S3 al salvataggio configurazione
-- Logging dettagliato tramite PrestaShopLogger
-- Gestione errori con try-catch e logging centralizzato
+- Sincronizzazione automatica con Google Merchant Center
+- Hook PrestaShop per eventi prodotto (add, update, delete, quantity)
+- Service class `GoogleMerchantService` per API Google
+- Service class `SyncService` per logica sincronizzazione
+- Model class `ProductModel` per gestione dati prodotti
+- Controller class `ProductSyncController` per gestione UI e azioni
+- Form di configurazione nel back office
+- Pannello stato configurazione
+- Sincronizzazione manuale di tutti i prodotti
+- Logging dettagliato errori
+- Upload credenziali Service Account JSON
+- Test configurazione Google Cloud
 - Documentazione completa in README.md
-- Guida installazione passo-passo in INSTALL.md
-- Script di validazione (validate.sh)
-- File .env.example per configurazione credenziali
-
-### Modificato
-- Namespace da `MlabPs\CookiePolicyModule` a `MlabPs\AwsUploadAssets`
-- Nome modulo da cookie policy a upload assets
-- Hook da display (frontend) ad action (backend)
-- Tab modulo da `front_office_features` a `back_office_features`
-- Campi configurazione per credenziali AWS invece di cookie policy
-
-### Rimosso
-- Logica cookie policy banner
-- Hook displayHeader, displayFooter, displayFooterAfter
-- Template Smarty per cookie banner
-- Configurazioni cookie policy
-- File TypeScript/JavaScript per frontend
 
 ### Tecnico
-- Architettura PSR-4 con autoloading Composer
-- Pattern Service Layer per separazione logica business
-- Dependency Injection per AWS SDK
+- Architettura MVC completa
+- Pattern PSR-4 con autoloading Composer
+- Dependency Injection per Google API Client
 - Compatibilità PrestaShop 8.x - 9.x
-- AWS SDK PHP ^3.357
-- Gestione file con stream per ottimizzare memoria
-- Content-Type automatico basato su estensione file
-- ACL public-read per accessibilità immagini
+- Google API Client PHP
+- Gestione sicura credenziali
+- Validazione prodotti prima sincronizzazione
 
 ### Sicurezza
-- Credenziali AWS salvate in Configuration (database PrestaShop)
-- File .env escluso da git
+- Credenziali Google salvate in Configuration (database PrestaShop)
 - Validazione input configurazione
-- Gestione sicura errori AWS
+- Gestione sicura errori API Google
 
 ## Note di Migrazione
 
-Questo modulo è stato completamente refactored da un modulo cookie policy.
-Non ci sono migrazioni da versioni precedenti.
+### Da v1.0.0 a v1.1.0
+- Nessuna migrazione richiesta
+- Nuova funzionalità Facebook Feed disponibile immediatamente
+- Configurazione esistente Google Merchant Center non influenzata
 
 ## Breaking Changes
 
-- Nessuno (prima release)
+- Nessuno
 
 ## Known Issues
 
@@ -66,13 +73,13 @@ Non ci sono migrazioni da versioni precedenti.
 ## Roadmap Futuro
 
 Possibili funzionalità future:
-- [ ] Eliminazione immagini da S3 quando eliminate da PrestaShop
-- [ ] Sincronizzazione batch di immagini esistenti
-- [ ] Supporto per altri tipi di asset (PDF, video, etc.)
-- [ ] CDN CloudFront integration
-- [ ] Compressione immagini prima dell'upload
-- [ ] Conversione formato WebP
-- [ ] Dashboard statistiche upload
-- [ ] Backup automatico su S3
-- [ ] Multi-bucket support
-- [ ] Lazy upload (queue system)
+- [ ] Rigenerazione automatica feed Facebook su schedule (cron)
+- [ ] Supporto feed per altri marketplace (Amazon, eBay)
+- [ ] Feed multilingua
+- [ ] Mapping categorie personalizzato
+- [ ] Filtri avanzati per inclusione/esclusione prodotti
+- [ ] Dashboard statistiche sincronizzazione
+- [ ] Notifiche email su errori sincronizzazione
+- [ ] Batch processing per grandi cataloghi
+- [ ] API REST per gestione feed
+- [ ] Integrazione Google Analytics per tracking performance
