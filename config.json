@@ -1,8 +1,8 @@
 {
-  "name": "mlab_aws_upload_assets",
-  "displayName": "MLab AWS Upload Assets",
+  "name": "mlab_product_sync",
+  "displayName": "MLab Product Sync",
   "version": "1.0.0",
-  "description": "Upload product images to AWS S3",
+  "description": "Sync products with Google Merchant Center",
   "author": "mlabfactory",
   "tab": "back_office_features",
   "is_configurable": 1,
@@ -16,18 +16,19 @@
   },
   "dependencies": [],
   "hooks": [
-    "actionWatermark",
-    "actionAfterImageUpload",
-    "actionAfterUpdateProductImage"
+    "actionProductAdd",
+    "actionProductUpdate",
+    "actionProductDelete",
+    "actionUpdateQuantity"
   ],
   "translations": {
     "en": {
-      "displayName": "MLab AWS Upload Assets",
-      "description": "Upload product images to AWS S3"
+      "displayName": "MLab Product Sync",
+      "description": "Sync products with Google Merchant Center"
     },
     "it": {
-      "displayName": "MLab AWS Upload Assets",
-      "description": "Carica le immagini dei prodotti su AWS S3"
+      "displayName": "MLab Product Sync",
+      "description": "Sincronizza i prodotti con Google Merchant Center"
     }
   }
 }

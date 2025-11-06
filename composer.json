@@ -1,9 +1,9 @@
 {
-    "name": "mlab/ps-aws-upload-assets",
-    "description": "Prestashop custom module to upload assets to AWS S3",
+    "name": "mlab/ps-product-sync",
+    "description": "Prestashop custom module to sync products with Google Merchant Center",
     "autoload": {
         "psr-4": {
-            "MlabPs\\AwsUploadAssets\\": "src/"
+            "MlabPs\\ProductSync\\": "src/"
         }
     },
     "authors": [
@@ -13,6 +13,7 @@
         }
     ],
     "require": {
-        "aws/aws-sdk-php": "^3.357"
+        "google/apiclient": "~v2.2",
+        "monolog/monolog": "~2.10.0"
     }
 }

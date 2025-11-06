@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Prestashop Module to upload product images to AWS S3
+ * Prestashop Module to sync products with Google Merchant Center
  * @author mlabfactory <tech@mlabfactory.com>
- * MlabPs - AWS Upload Assets Module
+ * MlabPs - Product Sync Module
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -16,7 +16,7 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 } else {
     // Autoloader alternativo manuale
     spl_autoload_register(function ($className) {
-        $prefix = 'MlabPs\\AwsUploadAssets\\';
+        $prefix = 'MlabPs\\ProductSync\\';
         $base_dir = __DIR__ . '/src/';
         
         $len = strlen($prefix);
@@ -34,16 +34,16 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 }
 
 // IMPORTANTE: use statement DOPO l'autoloader
-use MlabPs\AwsUploadAssets\Controllers\ModuleController;
+use MlabPs\ProductSync\Controllers\ProductSyncController;
 
 
-class mlab_aws_upload_assets extends Module
+class mlab_product_sync extends Module
 {
-    private $moduleController;
+    private $syncController;
 
     public function __construct()
     {
-        $this->name = 'mlab_aws_upload_assets';
+        $this->name = 'mlab_product_sync';
         $this->tab = 'back_office_features';
         $this->version = '1.0.0';
         $this->author = 'mlabfactory';
@@ -61,8 +61,8 @@ class mlab_aws_upload_assets extends Module
         // Chiamata SEMPRE sicura al parent constructor
         parent::__construct();
 
-        $this->displayName = $this->l('MLab AWS Upload Assets Module');
-        $this->description = $this->l('Upload product images to AWS S3');
+        $this->displayName = $this->l('MLab Product Sync Module');
+        $this->description = $this->l('Sync products with Google Merchant Center');
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall this module?');
 
         // Inizializza i controller solo dopo il parent constructor
@@ -75,7 +75,7 @@ class mlab_aws_upload_assets extends Module
     private function initializeControllers()
     {
         try {
-            $this->moduleController = new ModuleController($this, $this->name, $this->_path);
+            $this->syncController = new ProductSyncController($this);
         } catch (Exception $e) {
             // Log dell'errore per debug
             error_log("Errore inizializzazione controller: " . $e->getMessage());
@@ -84,52 +84,66 @@ class mlab_aws_upload_assets extends Module
     }
 
     /**
-     * Ottiene il widget controller, inizializzandolo se necessario
+     * Ottiene il controller, inizializzandolo se necessario
      */
-    private function getModuleController(): ModuleController
+    private function getSyncController(): ProductSyncController
     {
-        if (!$this->moduleController) {
+        if (!$this->syncController) {
             $this->initializeControllers();
         }
-        return $this->moduleController;
+        return $this->syncController;
     }
 
     public function install()
     {
         return parent::install() &&
-            $this->registerHook('actionWatermark') && // Quando le immagini vengono rigenerate
-            $this->registerHook('actionAfterImageUpload') && // Dopo l'upload di un'immagine
-            $this->registerHook('actionAfterUpdateProductImage'); // Dopo l'aggiornamento di un'immagine prodotto
+            $this->registerHook('actionProductAdd') && 
+            $this->registerHook('actionProductUpdate') && 
+            $this->registerHook('actionProductDelete') &&
+            $this->registerHook('actionUpdateQuantity') &&
+            Configuration::updateValue('MLAB_GMC_AUTO_SYNC', 1) &&
+            Configuration::updateValue('MLAB_GMC_MERCHANT_ID', '') &&
+            Configuration::updateValue('MLAB_GMC_CREDENTIALS', '');
     }
 
     public function uninstall()
     {
-        return parent::uninstall();
+        return parent::uninstall() &&
+            Configuration::deleteByName('MLAB_GMC_AUTO_SYNC') &&
+            Configuration::deleteByName('MLAB_GMC_MERCHANT_ID') &&
+            Configuration::deleteByName('MLAB_GMC_CREDENTIALS');
     }
 
     /**
-     * Hook chiamato quando le immagini vengono rigenerate
-     * Questo hook viene chiamato per ogni immagine rigenerata con tutti i suoi tagli
+     * Hook chiamato quando viene aggiunto un prodotto
      */
-    public function hookActionWatermark($params)
+    public function hookActionProductAdd($params)
     {
-        return $this->getModuleController()->handleImageRegeneration($params);
+        return $this->getSyncController()->handleProductAdd($params);
     }
 
     /**
-     * Hook chiamato dopo l'upload di un'immagine
+     * Hook chiamato quando viene aggiornato un prodotto
      */
-    public function hookActionAfterImageUpload($params)
+    public function hookActionProductUpdate($params)
     {
-        return $this->getModuleController()->handleImageUpload($params);
+        return $this->getSyncController()->handleProductUpdate($params);
     }
 
     /**
-     * Hook chiamato dopo l'aggiornamento di un'immagine prodotto
+     * Hook chiamato quando viene eliminato un prodotto
      */
-    public function hookActionAfterUpdateProductImage($params)
+    public function hookActionProductDelete($params)
     {
-        return $this->getModuleController()->handleProductImageUpdate($params);
+        return $this->getSyncController()->handleProductDelete($params);
+    }
+
+    /**
+     * Hook chiamato quando cambia la quantità
+     */
+    public function hookActionUpdateQuantity($params)
+    {
+        return $this->getSyncController()->handleQuantityUpdate($params);
     }
 
     /**
@@ -137,6 +151,6 @@ class mlab_aws_upload_assets extends Module
      */
     public function getContent()
     {
-        return $this->getModuleController()->handleConfiguration();
+        return $this->getSyncController()->handleConfiguration();
     }
 }
