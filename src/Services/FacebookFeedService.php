@@ -139,9 +139,13 @@ class FacebookFeedService
             $this->addElement($dom, $item, 'g:product_type', $productDetails['product_type']);
         }
 
-        if (!empty($productDetails['google_product_category'])) {
-            $this->addElement($dom, $item, 'g:google_product_category', $productDetails['google_product_category']);
-        }
+        // Google Product Category - usa mappatura alle categorie ufficiali Google Shopping
+        $googleCategory = $productDetails['google_product_category'];
+        $this->addElement($dom, $item, 'g:google_product_category', $googleCategory);
+        
+        // Identifier exists - indica se il prodotto ha GTIN/EAN o MPN
+        $identifierExists = (!empty($productDetails['gtin']) || !empty($productDetails['mpn'])) ? 'true' : 'false';
+        $this->addElement($dom, $item, 'g:identifier_exists', $identifierExists);
 
         // Immagini aggiuntive
         if (!empty($productDetails['additional_image_links'])) {

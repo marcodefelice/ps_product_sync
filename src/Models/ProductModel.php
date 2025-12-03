@@ -7,6 +7,7 @@ use StockAvailable;
 use Image;
 use Link;
 use Category;
+use MlabPs\ProductSync\Services\GoogleCategoryMappingService;
 
 /**
  * Model per gestire i dati dei prodotti
@@ -98,14 +99,102 @@ class ProductModel
     }
 
     /**
-     * Ottiene la categoria Google per il prodotto
+     * Ottiene la categoria Google Shopping per il prodotto
      */
     private function getGoogleCategory($productId)
     {
-        // Qui puoi implementare la logica per mappare le categorie PrestaShop
-        // alle categorie Google Merchant Center
-        // Per ora restituiamo una categoria generica
-        return '';
+        try {
+            $product = new Product($productId, false, $this->context->language->id);
+            
+            if (!$product->id) {
+                return GoogleCategoryMappingService::mapCategoryToGoogle('', [], []);
+            }
+
+            $categoryId = $product->id_category_default;
+            
+            // Se non ha categoria default, prova con le categorie associate
+            if (!$categoryId || $categoryId <= 2) {
+                $categories = Product::getProductCategoriesFull($productId);
+                if (!empty($categories)) {
+                    foreach ($categories as $cat) {
+                        if ($cat['id_category'] > 2) { // Evita root e home
+                            $categoryId = $cat['id_category'];
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Ottieni il percorso delle categorie
+            $categoryPath = $this->getCategoryPath($categoryId);
+            
+            // Usa l'ultima categoria (più specifica) come principale
+            $mainCategory = !empty($categoryPath) ? end($categoryPath) : '';
+            
+            // Prepara i dati del prodotto per l'analisi
+            $productAnalysisData = [
+                'title' => $product->name,
+                'description' => $product->description,
+                'short_description' => $product->description_short,
+                'reference' => $product->reference,
+                'brand' => $product->manufacturer_name
+            ];
+            
+            // Mappa alla categoria Google Shopping con analisi del prodotto
+            return GoogleCategoryMappingService::mapCategoryToGoogle(
+                $mainCategory, 
+                $categoryPath, 
+                $productAnalysisData
+            );
+            
+        } catch (\Exception $e) {
+            // In caso di errore, restituisci categoria di default
+            return GoogleCategoryMappingService::mapCategoryToGoogle('', [], []);
+        }
+    }
+
+    /**
+     * Ottiene il percorso delle categorie (per aiutare la mappatura)
+     */
+    private function getCategoryPath($categoryId, $langId = null)
+    {
+        if ($langId === null) {
+            $langId = $this->context->language->id;
+        }
+
+        $path = [];
+        $currentCategoryId = $categoryId;
+        $maxLevels = 10; // Evita loop infiniti
+        $level = 0;
+
+        // Risali la gerarchia delle categorie
+        while ($currentCategoryId && $currentCategoryId > 2 && $level < $maxLevels) {
+            $category = new Category($currentCategoryId, $langId);
+            
+            // Se la categoria non esiste o non è valida, fermati
+            if (!$category->id || !$category->active) {
+                break;
+            }
+            
+            // Se il nome è vuoto, fermati
+            if (empty(trim($category->name))) {
+                break;
+            }
+            
+            // Aggiungi la categoria al percorso
+            array_unshift($path, trim($category->name));
+            
+            // Vai al parent
+            $currentCategoryId = $category->id_parent;
+            $level++;
+            
+            // Se arriva alla categoria root o home, fermati
+            if ($currentCategoryId <= 2) {
+                break;
+            }
+        }
+
+        return $path;
     }
 
     /**

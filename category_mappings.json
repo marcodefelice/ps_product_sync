@@ -1,0 +1,28 @@
+{
+    "category_mappings": {
+        "description": "Mappatura delle categorie PrestaShop alle categorie Google Shopping ufficiali",
+        "mappings": {
+            "abbigliamento": "Apparel & Accessories",
+            "felpe": "Apparel & Accessories > Clothing > Outerwear > Hoodies & Sweatshirts",
+            "magliette": "Apparel & Accessories > Clothing > Tops > T-shirts",
+            "pantaloni": "Apparel & Accessories > Clothing > Pants",
+            "scarpe": "Apparel & Accessories > Shoes",
+            "accessori": "Apparel & Accessories > Clothing Accessories",
+            "casa": "Home & Garden",
+            "cucina": "Home & Garden > Kitchen & Dining",
+            "elettronica": "Electronics",
+            "smartphone": "Electronics > Communications > Telephony > Mobile Phones",
+            "sport": "Sporting Goods",
+            "libri": "Media > Books",
+            "giocattoli": "Toys & Games",
+            "bellezza": "Health & Beauty",
+            "cibo": "Food, Beverages & Tobacco > Food Items",
+            "animali": "Animals & Pet Supplies"
+        }
+    },
+    "instructions": {
+        "how_to_add_mapping": "Per aggiungere nuove mappature, aggiungi una voce nell'oggetto 'mappings' sopra",
+        "example": "\"nuova_categoria\": \"Google Category > Subcategory\"",
+        "google_categories_reference": "https://support.google.com/merchants/answer/6324436"
+    }
+}

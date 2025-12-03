@@ -27,6 +27,8 @@ Il feed generato segue lo standard RSS 2.0 con namespace Google Shopping (g:):
       <g:gtin>1234567890123</g:gtin>
       <g:mpn>SKU123</g:mpn>
       <g:product_type>Categoria</g:product_type>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Outerwear &gt; Hoodies &amp; Sweatshirts</g:google_product_category>
+      <g:identifier_exists>true</g:identifier_exists>
       <g:additional_image_link>https://tuonegozio.com/img/p/1/2/4/124.jpg</g:additional_image_link>
     </item>
     
@@ -53,7 +55,8 @@ Il feed generato segue lo standard RSS 2.0 con namespace Google Shopping (g:):
 - **g:gtin**: Codice EAN/UPC
 - **g:mpn**: Codice produttore (reference)
 - **g:product_type**: Categoria del prodotto
-- **g:google_product_category**: Categoria Google (se configurata)
+- **g:google_product_category**: Categoria ufficiale Google Shopping mappata automaticamente per OGNI prodotto. Sistema intelligente con analisi del prodotto e fallback garantito (es: "Apparel & Accessories > Clothing > Outerwear > Hoodies & Sweatshirts")
+- **g:identifier_exists**: Indica se il prodotto ha GTIN o MPN (true/false)
 - **g:additional_image_link**: Immagini aggiuntive (max 10)
 
 ## Utilizzo con Facebook
