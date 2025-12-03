@@ -2,6 +2,22 @@
 
 Tutte le modifiche rilevanti a questo progetto saranno documentate in questo file.
 
+## [1.1.1] - 2024
+
+### Aggiunto
+- Campo obbligatorio `g:google_product_category` nel feed Facebook
+- Campo obbligatorio `g:identifier_exists` nel feed Facebook
+- Logica per utilizzare mappatura categorie Google esistente (modulo Facebook)
+- Validazione GTIN (8/12/13/14 cifre numeriche)
+- Validazione MPN (stringa non vuota)
+- Categoria Google fallback su categoria prodotto PrestaShop
+- Integrazione con GoogleCategoryProvider per mappature esistenti
+
+### Migliorato
+- Qualità dati feed Facebook per migliore approvazione
+- Compatibilità con standard Google Shopping
+- Utilizzo mappature categorie configurate in altri moduli
+
 ## [1.1.0] - 2024
 
 ### Aggiunto

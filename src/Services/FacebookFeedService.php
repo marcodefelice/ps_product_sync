@@ -6,6 +6,8 @@ use MlabPs\ProductSync\Models\ProductModel;
 use Product;
 use DOMDocument;
 use DOMElement;
+use PrestaShop\Module\PrestashopFacebook\Provider\GoogleCategoryProvider;
+use PrestaShop\Module\PrestashopFacebook\Repository\GoogleCategoryRepository;
 
 /**
  * Servizio per generare il feed XML per Facebook Shop
@@ -15,12 +17,21 @@ class FacebookFeedService
     private $productModel;
     private $context;
     private $feedPath;
+    private $googleCategoryProvider;
 
     public function __construct($context = null)
     {
         $this->context = $context ?: \Context::getContext();
         $this->productModel = new ProductModel($this->context);
         $this->feedPath = _PS_ROOT_DIR_ . '/facebook_product_feed.xml';
+        
+        // Inizializza il provider per le categorie Google
+        if (class_exists('PrestaShop\Module\PrestashopFacebook\Provider\GoogleCategoryProvider')) {
+            $googleCategoryRepository = new GoogleCategoryRepository(
+                new \PrestaShop\Module\PrestashopFacebook\Adapter\ConfigurationAdapter()
+            );
+            $this->googleCategoryProvider = new GoogleCategoryProvider($googleCategoryRepository);
+        }
     }
 
     /**
@@ -122,6 +133,16 @@ class FacebookFeedService
         $this->addElement($dom, $item, 'g:link', $productDetails['link']);
         $this->addElement($dom, $item, 'g:image_link', $productDetails['image_link']);
 
+        // Google Product Category - migliorato per utilizzare la mappatura esistente
+        $googleCategory = $this->getGoogleProductCategory($productDetails);
+        if ($googleCategory) {
+            $this->addElement($dom, $item, 'g:google_product_category', $googleCategory);
+        }
+
+        // Identifier exists - nuovo attributo
+        $identifierExists = $this->hasValidIdentifiers($productDetails);
+        $this->addElement($dom, $item, 'g:identifier_exists', $identifierExists ? 'true' : 'false');
+
         // Campi opzionali ma consigliati
         if (!empty($productDetails['brand'])) {
             $this->addElement($dom, $item, 'g:brand', $productDetails['brand']);
@@ -138,14 +159,6 @@ class FacebookFeedService
         if (!empty($productDetails['product_type'])) {
             $this->addElement($dom, $item, 'g:product_type', $productDetails['product_type']);
         }
-
-        // Google Product Category - usa mappatura alle categorie ufficiali Google Shopping
-        $googleCategory = $productDetails['google_product_category'];
-        $this->addElement($dom, $item, 'g:google_product_category', $googleCategory);
-        
-        // Identifier exists - indica se il prodotto ha GTIN/EAN o MPN
-        $identifierExists = (!empty($productDetails['gtin']) || !empty($productDetails['mpn'])) ? 'true' : 'false';
-        $this->addElement($dom, $item, 'g:identifier_exists', $identifierExists);
 
         // Immagini aggiuntive
         if (!empty($productDetails['additional_image_links'])) {
@@ -303,5 +316,64 @@ class FacebookFeedService
             return @unlink($this->feedPath);
         }
         return true;
+    }
+
+    /**
+     * Ottiene la categoria Google per il prodotto utilizzando la mappatura esistente
+     */
+    private function getGoogleProductCategory(array $productDetails)
+    {
+        // Se abbiamo già una categoria Google nei dati del prodotto, usala
+        if (!empty($productDetails['google_product_category'])) {
+            return $productDetails['google_product_category'];
+        }
+
+        // Se abbiamo il provider delle categorie Google e l'ID categoria
+        if ($this->googleCategoryProvider && !empty($productDetails['category_id'])) {
+            try {
+                $categoryMatch = $this->googleCategoryProvider->getGoogleCategory(
+                    $productDetails['category_id'],
+                    $this->context->shop->id
+                );
+
+                if ($categoryMatch && !empty($categoryMatch['google_category_name'])) {
+                    return $categoryMatch['google_category_name'];
+                }
+            } catch (\Exception $e) {
+                // Log dell'errore ma continua senza categoria Google
+                error_log('Errore recupero categoria Google: ' . $e->getMessage());
+            }
+        }
+
+        // Fallback: usa categoria prodotto standard se disponibile
+        if (!empty($productDetails['product_type'])) {
+            return $productDetails['product_type'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Verifica se il prodotto ha identificatori validi (GTIN o MPN)
+     */
+    private function hasValidIdentifiers(array $productDetails)
+    {
+        // Verifica presenza di GTIN valido (EAN-13, EAN-8, UPC-A, etc.)
+        $hasValidGtin = false;
+        if (!empty($productDetails['gtin'])) {
+            $gtin = trim($productDetails['gtin']);
+            // Verifica lunghezza GTIN (8, 12, 13, 14 cifre) e che sia numerico
+            $hasValidGtin = preg_match('/^\d{8}$|^\d{12}$|^\d{13}$|^\d{14}$/', $gtin);
+        }
+
+        // Verifica presenza di MPN valido
+        $hasValidMpn = false;
+        if (!empty($productDetails['mpn'])) {
+            $mpn = trim($productDetails['mpn']);
+            // MPN deve essere non vuoto e non essere solo spazi
+            $hasValidMpn = strlen($mpn) > 0 && !ctype_space($mpn);
+        }
+
+        return $hasValidGtin || $hasValidMpn;
     }
 }
